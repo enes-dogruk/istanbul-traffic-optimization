@@ -1,0 +1,14 @@
+# Veri setleri ve Makine Öğrenmesi Ağırlıkları (GitHub'a YÜKLENMEYECEK)
+*.csv
+*.xlsx
+*.pkl
+
+# Python Ön Bellek Dosyaları
+__pycache__/
+*.pyc
+
+# Sanal Ortamlar
+.venv/
+venv/
+env/
+.env
