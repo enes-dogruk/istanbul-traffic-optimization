@@ -156,15 +156,51 @@ st.markdown("""
 if 'analiz_yapildi' not in st.session_state:
     st.session_state.update({'analiz_yapildi': False, 'map_obj': None, 'route_stats': []})
 
-istanbul_hubs = {
-    "Taksim (Meydan)": (41.0360, 28.9850), "Beşiktaş (Meydan)": (41.0422, 29.0077),
-    "Beşiktaş Stadyumu (Tüpraş)": (41.0395, 28.9940), "Mecidiyeköy (Meydan)": (41.0660, 28.9920),
-    "Levent (Büyükdere Cd.)": (41.0810, 29.0140), "Maslak (Büyükdere Cd.)": (41.1070, 29.0230),
-    "Karaköy (İskele)": (41.0220, 28.9760), "Eminönü (İskele)": (41.0150, 28.9730),
-    "Bakırköy (İncirli)": (40.9800, 28.8710), "Avcılar (Metrobüs)": (40.9790, 28.7210),
-    "Beylikdüzü (Meydan)": (41.0010, 28.6410), "Sarıyer (Merkez)": (41.1680, 29.0550),
-    "Rams Park (Seyrantepe)": (41.1034, 28.9944), "Kadıköy (Rıhtım)": (40.9900, 29.0200),
-    "Fenerbahçe Stadyumu (Kadıköy)": (40.9876, 29.0369)
+# --- İSTANBUL STRATEJİK LOKASYON AĞI ---
+# Kullanıcının Streamlit arayüzünde kaybolmaması için mantıksal olarak dağıtılmıştır.
+
+ISTANBUL_LOCATIONS = {
+    # --- 1. MEYDANLAR VE MERKEZLER ---
+    "Taksim (Meydan)": (41.0360, 28.9850),
+    "Beşiktaş (Meydan)": (41.0422, 29.0077),
+    "Mecidiyeköy (Meydan)": (41.0660, 28.9920),
+    "Kadıköy (Rıhtım)": (40.9900, 29.0200),
+    "Üsküdar (Meydan)": (41.0270, 29.0150),
+    "Bakırköy (İncirli)": (40.9800, 28.8710),
+    "Avcılar (Metrobüs)": (40.9790, 28.7210),
+    "Beylikdüzü (Meydan)": (41.0010, 28.6410),
+    "Sarıyer (Merkez)": (41.1680, 29.0550),
+    "Pendik (Merkez)": (40.8760, 29.2310),
+    
+    # --- 2. İŞ VE FİNANS MERKEZLERİ ---
+    "Levent (Büyükdere Cd.)": (41.0810, 29.0140),
+    "Maslak (Büyükdere Cd.)": (41.1070, 29.0230),
+    "Ataşehir (Finans Merkezi)": (40.9990, 29.1160),
+    "Şişli (Bomonti)": (41.0590, 28.9790),
+
+    # --- 3. ULAŞIM VE TRANSFER NOKTALARI ---
+    "Sabiha Gökçen Havalimanı": (40.9032, 29.3175),
+    "İstanbul Havalimanı (IST)": (41.2590, 28.7420),
+    "Esenler Otogarı": (41.0390, 28.8950),
+    "Yenikapı İDO İskelesi": (41.0020, 28.9550),
+    "Bostancı İDO İskelesi": (40.9520, 29.0940),
+    
+    # --- 4. KÖPRÜLER VE KİLİT OTOYOL GİŞELERİ ---
+    "15 Temmuz Şehitler Köprüsü (Giriş)": (41.0470, 29.0330),
+    "FSM Köprüsü (Giriş)": (41.0910, 29.0600),
+    "Mahmutbey Gişeler (Kilit Nokta)": (41.0580, 28.8090),
+    "Çamlıca Gişeler": (40.9930, 29.1460),
+
+    # --- 5. STADYUMLAR (Anomali Bölgeleri) ---
+    "Rams Park (Seyrantepe)": (41.1034, 28.9944),
+    "Beşiktaş Stadyumu (Tüpraş)": (41.0395, 28.9940),
+    "Fenerbahçe Stadyumu (Kadıköy)": (40.9876, 29.0369),
+    
+    # --- 6. DEV HASTANELER VE KAMPÜSLER ---
+    "Çam ve Sakura Şehir Hastanesi": (41.0930, 28.7900),
+    "Prof. Dr. Cemil Taşcıoğlu Şehir Hastanesi": (41.0620, 28.9740),
+    "İTÜ (Maslak Kampüsü)": (41.1050, 29.0230),
+    "Boğaziçi Üniversitesi (Güney Kampüs)": (41.0830, 29.0500)
 }
 
 col_panel, col_map = st.columns([1, 2.2])
