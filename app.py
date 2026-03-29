@@ -31,6 +31,17 @@ def check_match_zone(lat, lon, selected_date, hour):
             return 1
     return 0
 
+def estimate_vehicles(hour, is_weekend):
+    # İstanbul trafiği için saatlik ortalama araç hacmi simülasyonu (Dinamik)
+    if not is_weekend:
+        if 7 <= hour <= 9: return 4500     # Sabah işe gidiş piki
+        elif 17 <= hour <= 20: return 5500 # Akşam mesai çıkışı piki (En yoğun)
+        elif 10 <= hour <= 16: return 2500 # Gün ortası normal akış
+        else: return 500                   # Gece saatleri boş yollar
+    else:
+        if 13 <= hour <= 20: return 3500   # Hafta sonu öğleden sonra/akşam gezmesi
+        else: return 800                   # Hafta sonu sabah/gece
+
 # --- 2. ASSETS (SESSİZ ÇÖKMEYİ ENGELLEYEN YAPI) ---
 @st.cache_resource
 def load_assets():
@@ -90,51 +101,32 @@ st.markdown("""
         padding-left: 10px !important; width: 100% !important;
     }
 
-    /* --- BUTON SINIRLARI SIFIRLANDI, YAZI DUVARLARA DAYANDI --- */
     .stButton { margin-top: 25px !important; margin-bottom: 15px !important; }
     .stButton>button {
-        width: 100% !important; 
-        border-radius: 15px !important; 
-        height: 80px !important; 
-        background-color: #1C2F60 !important;
-        color: white !important; 
-        font-weight: 950 !important; 
-        font-size: 2.85rem !important; /* MAKSİMUM BOYUT */
-        padding: 0 !important; /* SAĞ-SOL BOŞLUKLARI YOK ET */
-        margin: 0 !important;
+        width: 100% !important; border-radius: 15px !important; height: 80px !important; 
+        background-color: #1C2F60 !important; color: white !important; font-weight: 950 !important; 
+        font-size: 2.85rem !important; padding: 0 !important; margin: 0 !important;
         border: 3px solid #00FFFF !important;
         box-shadow: 0 0 20px rgba(0, 255, 255, 0.5), 0 0 40px rgba(0, 255, 255, 0.2) !important; 
         text-shadow: 0 0 15px rgba(255, 255, 255, 0.8) !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        white-space: nowrap !important; /* ALT SATIRA GEÇMEYİ YASAKLA */
-        letter-spacing: -0.5px !important; /* Harfleri hafif sıkıştır ki sığsın */
-        overflow: hidden !important;
+        display: flex !important; align-items: center !important; justify-content: center !important;
+        white-space: nowrap !important; letter-spacing: -0.5px !important; overflow: hidden !important;
         transition: all 0.3s ease-in-out;
     }
-    .stButton>button p {
-        width: 100% !important;
-        margin: 0 !important; 
-        padding: 0 !important;
-    }
+    .stButton>button p { width: 100% !important; margin: 0 !important; padding: 0 !important; }
     .stButton>button:hover {
         box-shadow: 0 0 30px rgba(0, 255, 255, 1.0), 0 0 60px rgba(0, 255, 255, 0.6) !important;
-        transform: scale(1.02);
-        background-color: #1e3a8a !important;
+        transform: scale(1.02); background-color: #1e3a8a !important;
     }
 
-    /* --- SONUÇ KARTLARI VE ALTIN SARISI VURGU --- */
     .route-card {
         padding: 15px !important; border-radius: 15px; color: white; 
         border: 1px solid rgba(0, 255, 255, 0.2); box-shadow: 0 8px 20px rgba(0,0,0,0.6); 
         display: flex; flex-direction: column;
     }
     .best-route { 
-        border: 2px solid #FFD700 !important; 
-        border-left: 8px solid #FFD700 !important; 
-        background-color: #1C2F60;
-        box-shadow: 0 0 15px rgba(255, 215, 0, 0.4); 
+        border: 2px solid #FFD700 !important; border-left: 8px solid #FFD700 !important; 
+        background-color: #1C2F60; box-shadow: 0 0 15px rgba(255, 215, 0, 0.4); 
     } 
     .alt-route { background-color: #2B3949; border-left: 8px solid #FF00FF !important; }  
     .route-title { font-size: 1.1rem !important; font-weight: 900; margin-bottom: 8px; }
@@ -143,11 +135,7 @@ st.markdown("""
     .route-details { font-size: 1.0rem !important; color: #cbd5e1; }
 
     [data-testid="column"]:nth-of-type(2) { padding-left: 20px; }
-    iframe {
-        border-radius: 20px !important;
-        border: 1px solid rgba(0, 255, 255, 0.15) !important;
-        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95);
-    }
+    iframe { border-radius: 20px !important; border: 1px solid rgba(0, 255, 255, 0.15) !important; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95); }
     hr { margin: 15px 0 !important; border-color: rgba(0, 255, 255, 0.3) !important; }
     [data-testid="column"] [data-testid="column"] { padding-right: 8px !important; padding-left: 8px !important; }
     </style>
@@ -157,50 +145,22 @@ if 'analiz_yapildi' not in st.session_state:
     st.session_state.update({'analiz_yapildi': False, 'map_obj': None, 'route_stats': []})
 
 # --- İSTANBUL STRATEJİK LOKASYON AĞI ---
-# Kullanıcının Streamlit arayüzünde kaybolmaması için mantıksal olarak dağıtılmıştır.
-
-ISTANBUL_LOCATIONS = {
-    # --- 1. MEYDANLAR VE MERKEZLER ---
-    "Taksim (Meydan)": (41.0360, 28.9850),
-    "Beşiktaş (Meydan)": (41.0422, 29.0077),
-    "Mecidiyeköy (Meydan)": (41.0660, 28.9920),
-    "Kadıköy (Rıhtım)": (40.9900, 29.0200),
-    "Üsküdar (Meydan)": (41.0270, 29.0150),
-    "Bakırköy (İncirli)": (40.9800, 28.8710),
-    "Avcılar (Metrobüs)": (40.9790, 28.7210),
-    "Beylikdüzü (Meydan)": (41.0010, 28.6410),
-    "Sarıyer (Merkez)": (41.1680, 29.0550),
-    "Pendik (Merkez)": (40.8760, 29.2310),
-    
-    # --- 2. İŞ VE FİNANS MERKEZLERİ ---
-    "Levent (Büyükdere Cd.)": (41.0810, 29.0140),
-    "Maslak (Büyükdere Cd.)": (41.1070, 29.0230),
-    "Ataşehir (Finans Merkezi)": (40.9990, 29.1160),
-    "Şişli (Bomonti)": (41.0590, 28.9790),
-
-    # --- 3. ULAŞIM VE TRANSFER NOKTALARI ---
-    "Sabiha Gökçen Havalimanı": (40.9032, 29.3175),
-    "İstanbul Havalimanı (IST)": (41.2590, 28.7420),
-    "Esenler Otogarı": (41.0390, 28.8950),
-    "Yenikapı İDO İskelesi": (41.0020, 28.9550),
-    "Bostancı İDO İskelesi": (40.9520, 29.0940),
-    
-    # --- 4. KÖPRÜLER VE KİLİT OTOYOL GİŞELERİ ---
-    "15 Temmuz Şehitler Köprüsü (Giriş)": (41.0470, 29.0330),
-    "FSM Köprüsü (Giriş)": (41.0910, 29.0600),
-    "Mahmutbey Gişeler (Kilit Nokta)": (41.0580, 28.8090),
-    "Çamlıca Gişeler": (40.9930, 29.1460),
-
-    # --- 5. STADYUMLAR (Anomali Bölgeleri) ---
-    "Rams Park (Seyrantepe)": (41.1034, 28.9944),
-    "Beşiktaş Stadyumu (Tüpraş)": (41.0395, 28.9940),
-    "Fenerbahçe Stadyumu (Kadıköy)": (40.9876, 29.0369),
-    
-    # --- 6. DEV HASTANELER VE KAMPÜSLER ---
-    "Çam ve Sakura Şehir Hastanesi": (41.0930, 28.7900),
-    "Prof. Dr. Cemil Taşcıoğlu Şehir Hastanesi": (41.0620, 28.9740),
-    "İTÜ (Maslak Kampüsü)": (41.1050, 29.0230),
-    "Boğaziçi Üniversitesi (Güney Kampüs)": (41.0830, 29.0500)
+istanbul_hubs = {
+    "Taksim (Meydan)": (41.0360, 28.9850), "Beşiktaş (Meydan)": (41.0422, 29.0077),
+    "Mecidiyeköy (Meydan)": (41.0660, 28.9920), "Kadıköy (Rıhtım)": (40.9900, 29.0200),
+    "Üsküdar (Meydan)": (41.0270, 29.0150), "Bakırköy (İncirli)": (40.9800, 28.8710),
+    "Avcılar (Metrobüs)": (40.9790, 28.7210), "Beylikdüzü (Meydan)": (41.0010, 28.6410),
+    "Sarıyer (Merkez)": (41.1680, 29.0550), "Pendik (Merkez)": (40.8760, 29.2310),
+    "Levent (Büyükdere Cd.)": (41.0810, 29.0140), "Maslak (Büyükdere Cd.)": (41.1070, 29.0230),
+    "Ataşehir (Finans Merkezi)": (40.9990, 29.1160), "Şişli (Bomonti)": (41.0590, 28.9790),
+    "Sabiha Gökçen Havalimanı": (40.9032, 29.3175), "İstanbul Havalimanı (IST)": (41.2590, 28.7420),
+    "Esenler Otogarı": (41.0390, 28.8950), "Yenikapı İDO İskelesi": (41.0020, 28.9550),
+    "Bostancı İDO İskelesi": (40.9520, 29.0940), "15 Temmuz Şehitler Köprüsü (Giriş)": (41.0470, 29.0330),
+    "FSM Köprüsü (Giriş)": (41.0910, 29.0600), "Mahmutbey Gişeler (Kilit Nokta)": (41.0580, 28.8090),
+    "Çamlıca Gişeler": (40.9930, 29.1460), "Rams Park (Seyrantepe)": (41.1034, 28.9944),
+    "Beşiktaş Stadyumu (Tüpraş)": (41.0395, 28.9940), "Fenerbahçe Stadyumu (Kadıköy)": (40.9876, 29.0369),
+    "Çam ve Sakura Şehir Hastanesi": (41.0930, 28.7900), "Prof. Dr. Cemil Taşcıoğlu Şehir Hastanesi": (41.0620, 28.9740),
+    "İTÜ (Maslak Kampüsü)": (41.1050, 29.0230), "Boğaziçi Üniversitesi (Güney Kampüs)": (41.0830, 29.0500)
 }
 
 col_panel, col_map = st.columns([1, 2.2])
@@ -209,23 +169,19 @@ with col_panel:
     st.markdown("<h1 style='text-align: center; margin-bottom: 25px; color: white; font-size: 2.6rem;'>📊 Tahmin Paneli</h1>", unsafe_allow_html=True)
     
     if not model or not scaler:
-        st.error("🚨 DİKKAT: 'istanbul_traffic_rf_model.pkl' veya 'traffic_scaler.pkl' dosyası klasörde bulunamadı. Lütfen dosyaları app.py ile aynı klasöre koyun.")
+        st.error("🚨 DİKKAT: 'istanbul_traffic_rf_model.pkl' veya 'traffic_scaler.pkl' dosyası klasörde bulunamadı.")
     
     col_date, col_time = st.columns(2)
     with col_date:
-        # TARİH SEÇİMİ SADECE OCAK 2025'E KİLİTLENDİ
-        selected_date = st.date_input("📅 Tarih (Ocak 2025)", 
-                                      value=datetime.date(2025, 1, 10),
-                                      min_value=datetime.date(2025, 1, 1),
-                                      max_value=datetime.date(2025, 1, 31))
+        selected_date = st.date_input("📅 Tarih (Ocak 2025)", value=datetime.date(2025, 1, 10), min_value=datetime.date(2025, 1, 1), max_value=datetime.date(2025, 1, 31))
     with col_time:
         hour_opts = [f"{h:02d}:00" for h in range(24)]
         selected_hour_str = st.selectbox("⏰ Saat", hour_opts, index=18)
         hour = int(selected_hour_str.split(":")[0])
     
     st.markdown("<br>", unsafe_allow_html=True)
-    start_point = st.selectbox("📍 Başlangıç", list(istanbul_hubs.keys()), index=0)
-    end_point = st.selectbox("🏁 Varış", list(istanbul_hubs.keys()), index=12)
+    start_point = st.selectbox("📍 Başlangıç", list(istanbul_hubs.keys()), index=15) # Default: IST Havalimanı
+    end_point = st.selectbox("🏁 Varış", list(istanbul_hubs.keys()), index=12)      # Default: Ataşehir
         
     start_lat, start_lon = istanbul_hubs[start_point]
     end_lat, end_lon = istanbul_hubs[end_point]
@@ -255,13 +211,13 @@ with col_panel:
 
 with col_map:
     if predict_btn and model and scaler:
-        with st.spinner('Analiz yapılıyor...'):
+        with st.spinner('Yapay Zeka Dinamik Trafik Simülasyonunu Çalıştırıyor...'):
             osrm_url = f"http://router.project-osrm.org/route/v1/driving/{start_lon},{start_lat};{end_lon},{end_lat}?overview=full&geometries=polyline&alternatives=3"
             try:
                 r = requests.get(osrm_url).json()
                 if r.get('code') == 'Ok':
                     map_tiles = 'CartoDB dark_matter' if (hour >= 18 or hour <= 7) else 'CartoDB positron'
-                    m = folium.Map(location=[(start_lat+end_lat)/2, (start_lon+end_lon)/2], zoom_start=12, tiles=map_tiles)
+                    m = folium.Map(location=[(start_lat+end_lat)/2, (start_lon+end_lon)/2], zoom_start=11, tiles=map_tiles)
                     
                     route_results = []
                     day_of_week = selected_date.weekday()
@@ -275,13 +231,18 @@ with col_map:
                         num_samples = 15
                         sample_indices = np.linspace(0, len(coords)-1, num_samples, dtype=int)
                         preds = []
+                        
+                        # DINAMIK ARAÇ SAYISI HESAPLAMA (ÖLÜMCÜL HATA GİDERİLDİ)
+                        est_vehicles = estimate_vehicles(hour, is_weekend)
+
                         for s_idx in sample_indices:
                             pt_l, pt_lo = coords[s_idx]
                             is_m = check_match_zone(pt_l, pt_lo, selected_date, hour)
-                            df_in = pd.DataFrame([[pt_l, pt_lo, 150, hour, h_sin, h_cos, day_of_week, is_weekend, is_holiday, is_semester, is_m]], 
+                            
+                            df_in = pd.DataFrame([[pt_l, pt_lo, est_vehicles, hour, h_sin, h_cos, day_of_week, is_weekend, is_holiday, is_semester, is_m]], 
                                                  columns=['LATITUDE', 'LONGITUDE', 'NUMBER_OF_VEHICLES', 'hour', 'hour_sin', 'hour_cos', 'day_of_week', 'is_weekend', 'is_holiday', 'is_semester', 'is_match_zone'])
                             raw_speed = model.predict(scaler.transform(df_in))[0]
-                            if is_m == 1: raw_speed = raw_speed * 0.55
+                            if is_m == 1: raw_speed = raw_speed * 0.45 # Maç günü cezası
                             preds.append(raw_speed)
                         route_results.append({'index': r_idx, 'coords': coords, 'avg_speed': np.mean(preds), 'dist': route['distance']/1000})
 
@@ -301,12 +262,16 @@ with col_map:
                                 if len(seg_coords) < 2: continue
                                 mid_pt = coords[(s_idx + e_idx) // 2]
                                 is_m = check_match_zone(mid_pt[0], mid_pt[1], selected_date, hour)
-                                df_seg = pd.DataFrame([[mid_pt[0], mid_pt[1], 150, hour, h_sin, h_cos, day_of_week, is_weekend, is_holiday, is_semester, is_m]], 
-                                                     columns=['LATITUDE', 'LONGITUDE', 'NUMBER_OF_VEHICLES', 'hour', 'hour_sin', 'hour_cos', 'day_of_week', 'is_weekend', 'is_holiday', 'is_semester', 'is_match_zone'])
+                                
+                                df_seg = pd.DataFrame([[mid_pt[0], mid_pt[1], est_vehicles, hour, h_sin, h_cos, day_of_week, is_weekend, is_holiday, is_semester, is_m]], 
+                                                       columns=['LATITUDE', 'LONGITUDE', 'NUMBER_OF_VEHICLES', 'hour', 'hour_sin', 'hour_cos', 'day_of_week', 'is_weekend', 'is_holiday', 'is_semester', 'is_match_zone'])
                                 raw_speed = model.predict(scaler.transform(df_seg))[0]
-                                if is_m == 1: seg_speed = raw_speed * 0.55
+                                if is_m == 1: seg_speed = raw_speed * 0.45
                                 else: seg_speed = raw_speed
-                                s_color = '#FF0000' if seg_speed < 24 else ('#FFD700' if seg_speed < 40 else '#00FF00')
+                                
+                                # GERÇEKÇİ İSTANBUL RENK EŞİKLERİ
+                                s_color = '#FF0000' if seg_speed < 35 else ('#FFD700' if seg_speed < 55 else '#00FF00')
+                                
                                 folium.PolyLine(seg_coords, color="black", weight=10, opacity=0.6).add_to(m)
                                 folium.PolyLine(seg_coords, color=s_color, weight=6, opacity=1.0).add_to(m)
 
