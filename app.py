@@ -32,75 +32,63 @@ def check_match_zone(lat, lon, selected_date, hour):
     return 0
 
 def estimate_vehicles(hour, is_weekend):
-    # İstanbul trafiği için saatlik ortalama araç hacmi simülasyonu (Dinamik)
     if not is_weekend:
-        if 7 <= hour <= 9: return 4500     # Sabah işe gidiş piki
-        elif 17 <= hour <= 20: return 5500 # Akşam mesai çıkışı piki (En yoğun)
-        elif 10 <= hour <= 16: return 2500 # Gün ortası normal akış
-        else: return 500                   # Gece saatleri boş yollar
+        if 7 <= hour <= 9: return 4500     
+        elif 17 <= hour <= 20: return 5500 
+        elif 10 <= hour <= 16: return 2500 
+        else: return 500                   
     else:
-        if 13 <= hour <= 20: return 3500   # Hafta sonu öğleden sonra/akşam gezmesi
-        else: return 800                   # Hafta sonu sabah/gece
+        if 13 <= hour <= 20: return 3500   
+        else: return 800                   
 
-# --- 2. ASSETS (SESSİZ ÇÖKMEYİ ENGELLEYEN YAPI) ---
+# --- 2. ASSETS (SİSTEM BEYNİ: GRADIENT BOOSTING) ---
 @st.cache_resource
 def load_assets():
-    if not os.path.exists('istanbul_traffic_rf_model.pkl') or not os.path.exists('traffic_scaler.pkl'):
+    if not os.path.exists('istanbul_kds_gradient_boosting.pkl') or not os.path.exists('istanbul_kds_scaler.pkl'):
         return None, None
     try:
-        model = joblib.load('istanbul_traffic_rf_model.pkl')
-        scaler = joblib.load('traffic_scaler.pkl')
+        model = joblib.load('istanbul_kds_gradient_boosting.pkl')
+        scaler = joblib.load('istanbul_kds_scaler.pkl')
         return model, scaler
     except Exception as e: 
         return None, None
 
 model, scaler = load_assets()
 
-# --- 3. UI AYARLARI VE CSS ---
-st.set_page_config(page_title="İBB Akıllı Trafik Modeli", layout="wide", page_icon="🧭")
+# --- 3. UI AYARLARI VE SİBER-VİZYON CSS ---
+st.set_page_config(page_title="İBB Akıllı Trafik Modeli", layout="wide", page_icon="🚦")
 
 st.markdown("""
     <style>
     .block-container { padding: 1rem 2rem !important; max-width: 100% !important; }
     header, footer, [data-testid="collapsedControl"] { visibility: hidden !important; display: none !important; }
     .stApp { background-color: #0b1120; } 
-
     [data-testid="column"]:nth-of-type(1) {
-        background-color: rgba(43, 65, 94, 0.85);
-        backdrop-filter: blur(16px);
-        padding: 25px 30px !important;
-        border-radius: 20px;
+        background-color: rgba(43, 65, 94, 0.85); backdrop-filter: blur(16px);
+        padding: 25px 30px !important; border-radius: 20px;
         border: 1px solid rgba(0, 255, 255, 0.3);
         box-shadow: 0 0 20px rgba(0, 255, 255, 0.2), 0 0 40px rgba(255, 0, 255, 0.1) !important;
-        height: calc(100vh - 2rem);
-        overflow-y: auto;
+        height: calc(100vh - 2rem); overflow-y: auto;
     }
-
     [data-testid="column"]:nth-of-type(1) > div > div > div { gap: 0.8rem !important; } 
-
     label, .stMarkdown p { 
         color: #FFFFFF !important; font-weight: 800 !important; font-size: 1.15rem !important; 
         margin-bottom: 5px !important; letter-spacing: 0.5px;
     }
-
     div[data-baseweb="select"] > div, div[data-baseweb="input"] > div {
         background-color: rgba(23, 51, 91, 0.8) !important; 
-        border: 1px solid rgba(0, 255, 255, 0.3) !important;
-        border-radius: 10px !important; height: 3.8rem !important; 
-        display: flex !important; align-items: center !important; 
+        border: 1px solid rgba(0, 255, 255, 0.3) !important; border-radius: 10px !important; 
+        height: 3.8rem !important; display: flex !important; align-items: center !important; 
     }
-    
     .stDateInput div[data-baseweb="input"] { background-color: transparent !important; }
     div[data-baseweb="select"] *, .stDateInput input {
         color: #FFFFFF !important; font-size: 1.15rem !important; font-weight: bold !important; 
     }
-    
     .stDateInput input { text-align: center !important; width: 100% !important; }
     div[data-baseweb="select"] > div > div > div {
         display: flex !important; justify-content: flex-start !important;
         padding-left: 10px !important; width: 100% !important;
     }
-
     .stButton { margin-top: 25px !important; margin-bottom: 15px !important; }
     .stButton>button {
         width: 100% !important; border-radius: 15px !important; height: 80px !important; 
@@ -118,7 +106,6 @@ st.markdown("""
         box-shadow: 0 0 30px rgba(0, 255, 255, 1.0), 0 0 60px rgba(0, 255, 255, 0.6) !important;
         transform: scale(1.02); background-color: #1e3a8a !important;
     }
-
     .route-card {
         padding: 15px !important; border-radius: 15px; color: white; 
         border: 1px solid rgba(0, 255, 255, 0.2); box-shadow: 0 8px 20px rgba(0,0,0,0.6); 
@@ -133,13 +120,12 @@ st.markdown("""
     .route-time { font-size: 2.0rem !important; font-weight: bold; color: #00FFFF; }
     .best-route .route-time { color: #FFD700 !important; text-shadow: 0 0 10px rgba(255, 215, 0, 0.6) !important; }
     .route-details { font-size: 1.0rem !important; color: #cbd5e1; }
-
     [data-testid="column"]:nth-of-type(2) { padding-left: 20px; }
     iframe { border-radius: 20px !important; border: 1px solid rgba(0, 255, 255, 0.15) !important; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95); }
     hr { margin: 15px 0 !important; border-color: rgba(0, 255, 255, 0.3) !important; }
     [data-testid="column"] [data-testid="column"] { padding-right: 8px !important; padding-left: 8px !important; }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 if 'analiz_yapildi' not in st.session_state:
     st.session_state.update({'analiz_yapildi': False, 'map_obj': None, 'route_stats': []})
@@ -169,7 +155,7 @@ with col_panel:
     st.markdown("<h1 style='text-align: center; margin-bottom: 25px; color: white; font-size: 2.6rem;'>📊 Tahmin Paneli</h1>", unsafe_allow_html=True)
     
     if not model or not scaler:
-        st.error("🚨 DİKKAT: 'istanbul_traffic_rf_model.pkl' veya 'traffic_scaler.pkl' dosyası klasörde bulunamadı.")
+        st.error("🚨 DİKKAT: 'istanbul_kds_gradient_boosting.pkl' veya 'istanbul_kds_scaler.pkl' dosyası klasörde bulunamadı.")
     
     col_date, col_time = st.columns(2)
     with col_date:
@@ -180,8 +166,8 @@ with col_panel:
         hour = int(selected_hour_str.split(":")[0])
     
     st.markdown("<br>", unsafe_allow_html=True)
-    start_point = st.selectbox("📍 Başlangıç", list(istanbul_hubs.keys()), index=15) # Default: IST Havalimanı
-    end_point = st.selectbox("🏁 Varış", list(istanbul_hubs.keys()), index=12)      # Default: Ataşehir
+    start_point = st.selectbox("📍 Başlangıç", list(istanbul_hubs.keys()), index=15)
+    end_point = st.selectbox("🏁 Varış", list(istanbul_hubs.keys()), index=12)      
         
     start_lat, start_lon = istanbul_hubs[start_point]
     end_lat, end_lon = istanbul_hubs[end_point]
@@ -232,7 +218,6 @@ with col_map:
                         sample_indices = np.linspace(0, len(coords)-1, num_samples, dtype=int)
                         preds = []
                         
-                        # DINAMIK ARAÇ SAYISI HESAPLAMA (ÖLÜMCÜL HATA GİDERİLDİ)
                         est_vehicles = estimate_vehicles(hour, is_weekend)
 
                         for s_idx in sample_indices:
@@ -242,7 +227,7 @@ with col_map:
                             df_in = pd.DataFrame([[pt_l, pt_lo, est_vehicles, hour, h_sin, h_cos, day_of_week, is_weekend, is_holiday, is_semester, is_m]], 
                                                  columns=['LATITUDE', 'LONGITUDE', 'NUMBER_OF_VEHICLES', 'hour', 'hour_sin', 'hour_cos', 'day_of_week', 'is_weekend', 'is_holiday', 'is_semester', 'is_match_zone'])
                             raw_speed = model.predict(scaler.transform(df_in))[0]
-                            if is_m == 1: raw_speed = raw_speed * 0.45 # Maç günü cezası
+                            if is_m == 1: raw_speed = raw_speed * 0.45 
                             preds.append(raw_speed)
                         route_results.append({'index': r_idx, 'coords': coords, 'avg_speed': np.mean(preds), 'dist': route['distance']/1000})
 
@@ -269,7 +254,6 @@ with col_map:
                                 if is_m == 1: seg_speed = raw_speed * 0.45
                                 else: seg_speed = raw_speed
                                 
-                                # GERÇEKÇİ İSTANBUL RENK EŞİKLERİ
                                 s_color = '#FF0000' if seg_speed < 35 else ('#FFD700' if seg_speed < 55 else '#00FF00')
                                 
                                 folium.PolyLine(seg_coords, color="black", weight=10, opacity=0.6).add_to(m)

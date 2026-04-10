@@ -1,14 +1,12 @@
-# Veri setleri ve Makine Öğrenmesi Ağırlıkları (GitHub'a YÜKLENMEYECEK)
+# Veri Setleri
 *.csv
 *.xlsx
+
+# Model ve Scaler Dosyaları
 *.pkl
+*.joblib
 
-# Python Ön Bellek Dosyaları
+# Sistem Kalıntıları
 __pycache__/
-*.pyc
-
-# Sanal Ortamlar
-.venv/
-venv/
-env/
+.ipynb_checkpoints/
 .env
