@@ -40,3 +40,5 @@ Her şey hazır. Arayüzü başlatmak için terminale şunu yazın:
 `streamlit run app.py`
 
 Tarayıcınızda otomatik olarak `localhost:8501` açılacak ve sistem çalışacaktır.
+
+Proje Linki : https://github.com/enes-dogruk/istanbul-traffic-optimization
